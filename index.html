@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Буквы прилетают и улетают</title>
+<style>
+  body {
+    background: black;
+    color: #00ff00;
+    font-family: monospace;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #container {
+    position: relative;
+    width: 600px;
+    min-height: 60px;
+    border: 2px solid #00ff00;
+    padding: 10px;
+    font-size: 36px;
+    display: flex;
+    flex-wrap: wrap;
+    cursor: text;
+    user-select: none;
+  }
+  .letter {
+    position: relative;
+    display: inline-block;
+    opacity: 1;
+  }
+  .flying-letter {
+    position: fixed;
+    color: #00ff00;
+    font-family: monospace;
+    font-size: 36px;
+    pointer-events: none;
+    user-select: none;
+    will-change: transform, opacity;
+    z-index: 1000;
+  }
+</style>
+</head>
+<body>
+
+<div id="container" tabindex="0"></div>
+
+<script>
+  const container = document.getElementById('container');
+  container.focus();
+
+  // Массив букв (DOM-элементов)
+  let letters = [];
+
+  // Для фокуса и имитации курсора
+  let cursorPos = 0;
+
+  // Клик по контейнеру — ставим курсор в конец
+  container.addEventListener('click', () => {
+    cursorPos = letters.length;
+    updateCursor();
+  });
+
+  // Обработка ввода с клавиатуры
+  window.addEventListener('keydown', (e) => {
+    e.preventDefault();
+
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Вставляем букву в позицию курсора
+      insertLetter(e.key);
+    } else if (e.key === "Backspace") {
+      deleteLetter();
+    } else if (e.key === "ArrowLeft") {
+      if (cursorPos > 0) cursorPos--;
+      updateCursor();
+    } else if (e.key === "ArrowRight") {
+      if (cursorPos < letters.length) cursorPos++;
+      updateCursor();
+    }
+  });
+
+  function updateCursor() {
+    // Удалим все курсоры
+    container.querySelectorAll('.cursor').forEach(el => el.remove());
+
+    // Создадим элемент курсора (вертикальная линия)
+    const cursor = document.createElement('span');
+    cursor.classList.add('cursor');
+    cursor.style.width = '2px';
+    cursor.style.background = '#00ff00';
+    cursor.style.display = 'inline-block';
+    cursor.style.height = '1em';
+    cursor.style.margin = '0 2px';
+    cursor.style.verticalAlign = 'bottom';
+    cursor.style.animation = 'blink 1s step-start 0s infinite';
+
+    // Вставляем курсор в нужную позицию
+    if (cursorPos === letters.length) {
+      container.appendChild(cursor);
+    } else {
+      container.insertBefore(cursor, letters[cursorPos]);
+    }
+  }
+
+  // Вставка буквы с анимацией прилёта
+  function insertLetter(char) {
+    const flying = document.createElement('div');
+    flying.classList.add('flying-letter');
+    flying.textContent = char;
+
+    // Старт: рандомная точка за пределами экрана
+    const startX = Math.random() * window.innerWidth;
+    const startY = Math.random() * window.innerHeight;
+
+    flying.style.left = startX + 'px';
+    flying.style.top = startY + 'px';
+    flying.style.opacity = '1';
+
+    document.body.appendChild(flying);
+
+    // Получаем позицию для буквы в контейнере
+    // Создаем временный span чтобы узнать позицию
+    const tempSpan = document.createElement('span');
+    tempSpan.textContent = char;
+    tempSpan.style.visibility = 'hidden';
+    container.insertBefore(tempSpan, letters[cursorPos] || null);
+    const targetRect = tempSpan.getBoundingClientRect();
+    container.removeChild(tempSpan);
+
+    // Анимация: перелёт к позиции
+    const anim = flying.animate([
+      { transform: 'translate(0,0)', opacity: 1, left: startX + 'px', top: startY + 'px' },
+      { transform: `translate(${targetRect.left - startX}px, ${targetRect.top - startY}px)`, opacity: 1 }
+    ], {
+      duration: 800,
+      easing: 'ease-out',
+      fill: 'forwards'
+    });
+
+    anim.onfinish = () => {
+      flying.remove();
+
+      // Создаем постоянный элемент буквы
+      const letterSpan = document.createElement('span');
+      letterSpan.textContent = char;
+      letterSpan.classList.add('letter');
+
+      // Вставляем в контейнер в нужное место
+      container.insertBefore(letterSpan, letters[cursorPos] || null);
+
+      // Обновляем массив и позицию курсора
+      letters.splice(cursorPos, 0, letterSpan);
+      cursorPos++;
+      updateCursor();
+    };
+  }
+
+  // Удаление буквы с анимацией улёта
+  function deleteLetter() {
+    if (cursorPos === 0) return;
+
+    const letterSpan = letters[cursorPos - 1];
+    if (!letterSpan) return;
+
+    // Получаем позицию буквы на экране
+    const rect = letterSpan.getBoundingClientRect();
+
+    // Создаем летающий элемент поверх буквы
+    const flying = document.createElement('div');
+    flying.classList.add('flying-letter');
+    flying.textContent = letterSpan.textContent;
+    flying.style.left = rect.left + 'px';
+    flying.style.top = rect.top + 'px';
+    flying.style.opacity = '1';
+
+    document.body.appendChild(flying);
+
+    // Удаляем букву из контейнера и массива
+    container.removeChild(letterSpan);
+    letters.splice(cursorPos - 1, 1);
+    cursorPos--;
+    updateCursor();
+
+    // Анимация улёта вверх и исчезновения
+    const anim = flying.animate([
+      { transform: 'translate(0,0)', opacity: 1 },
+      { transform: 'translate(0,-150px) rotate(360deg)', opacity: 0 }
+    ], {
+      duration: 800,
+      easing: 'ease-in',
+      fill: 'forwards'
+    });
+
+    anim.onfinish = () => flying.remove();
+  }
+
+  // Начальный курсор
+  updateCursor();
+</script>
+
+<style>
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+</style>
+
+</body>
+</html>
